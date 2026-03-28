@@ -1,10 +1,19 @@
 # AI-Powered Data Pipeline using n8n
 
-## 📌 Overview
+## 📌 Project
 
 This project demonstrates an end-to-end automated data pipeline built using n8n. The workflow ingests CSV data, performs data profiling, applies AI-based data quality analysis, cleans the data using rule-based logic, and generates an executive report.
 
-## 🚀 Features
+## 🚀 Overview
+
+This project demonstrates an automated data pipeline built using n8n that:
+- Reads CSV data
+- Performs data quality analysis
+- Uses AI for interpretation
+- Applies rule-based data cleaning
+- Generates structured reports
+
+## 🧠 Key Features
 
 * CSV data ingestion
 * Data profiling (missing values, types, anomalies)
@@ -27,9 +36,10 @@ This project demonstrates an end-to-end automated data pipeline built using n8n.
 2. Extract and transform data
 3. Analyze dataset using AI
 4. Apply decision logic
-5. Clean invalid records
+5. Clean data using JavaScript
 6. Generate summary report
 7. Export report as text file
+
 
 ## 📸 Screenshots
 
@@ -51,3 +61,29 @@ This project demonstrates an end-to-end automated data pipeline built using n8n.
 ## 👤 Author
 
 RajaRathan Kamble
+
+
+
+## 📂 Files
+
+- `workflow.json` → n8n workflow
+- `Employee.csv` → sample dataset
+
+## 🛠 Tools Used
+
+- n8n (workflow automation)
+- OpenAI (AI analysis)
+- JavaScript (data processing)
+- CSV (input dataset)
+
+## 📊 Output
+
+- Clean dataset
+- AI-driven analysis
+- Text report with insights
+
+## 💡 Learning Outcome
+
+- Combining AI with automation workflows
+- Data quality pipelines
+- Decision-based workflow execution
