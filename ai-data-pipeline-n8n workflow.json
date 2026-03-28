@@ -1,0 +1,355 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -384,
+        0
+      ],
+      "id": "4b8fe551-65b6-449a-b7e2-e43db837b893",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "C:\\Users\\Rathan Kamble\\.n8n-files\\Employee.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -176,
+        0
+      ],
+      "id": "19bf32e1-b388-4d60-a9ad-c8da5c47562d",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        0
+      ],
+      "id": "c5a2bc42-01fe-43c3-bce5-386246a9ca8b",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=You are a Data Quality Analysis Agent.\n\nIMPORTANT RULES:\n1. Only refer to provided column names.\n2. Do not invent new columns.\n3. If insufficient evidence exists, state: \"Not detectable from provided data\".\n4. Return structured JSON only.\n\nDataset summary:\n{{ JSON.stringify($json) }}\n\nReturn strictly in this format:\n{\n\"missing_values_analysis\": {},\n\"data_type_analysis\": {},\n\"anomaly_detection\": {}\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -416,
+        256
+      ],
+      "id": "2c450290-740d-4a62-aac0-224aaf22c006",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "...",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $json.output?.[0]?.content?.[0]?.text;\n\nif (!rawText) {\n  return [{ json: { error: \"OpenAI text not found\", received: $json } }];\n}\n\nlet aiOutput;\n\ntry {\n  aiOutput = JSON.parse(rawText);\n} catch (err) {\n  return [{ json: { error: \"JSON parse failed\", rawText } }];\n}\n\nif (!aiOutput.missing_values_analysis) {\n  return [{ json: { error: \"missing_values_analysis not found\", aiOutput } }];\n}\n\nconst missingValues = aiOutput.missing_values_analysis;\n\nlet maxMissing = 0;\n\nfor (const col in missingValues) {\n  const percent = parseFloat(String(missingValues[col]).replace(\"%\", \"\"));\n  if (!isNaN(percent) && percent > maxMissing) {\n    maxMissing = percent;\n  }\n}\n\nreturn [\n  {\n    json: {\n      max_missing_percentage: maxMissing,\n      missing_values: missingValues\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        256
+      ],
+      "id": "5cdd6180-1767-4380-9f0d-d528e4b7cbc0",
+      "name": "Analysis Summary"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allRows = items.map(item => item.json);\nconst rowCount = allRows.length;\nconst columns = Object.keys(allRows[0] || {});\n\nlet missingStats = {};\nlet typeStats = {};\nlet basicStats = {};\n\ncolumns.forEach(col => {\n  let values = allRows.map(r => r[col]);\n\n  let missing = values.filter(v => v === null || v === \"\" || v === undefined).length;\n  missingStats[col] = ((missing / rowCount) * 100).toFixed(2);\n\n  let numericCount = values.filter(v => !isNaN(parseFloat(v))).length;\n  typeStats[col] = {\n    numeric_percentage: ((numericCount / rowCount) * 100).toFixed(2)\n  };\n\n  let negatives = values.filter(v => !isNaN(v) && Number(v) < 0).length;\n  basicStats[col] = {\n    negative_values: negatives\n  };\n});\n\nreturn [\n  {\n    json: {\n      row_count: rowCount,\n      columns: columns,\n      missing_percentage: missingStats,\n      type_analysis: typeStats,\n      anomaly_signals: basicStats,\n      sample_rows: allRows.slice(0, 5)\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        0
+      ],
+      "id": "158f7ab2-8dcf-4574-9253-c9e3e6359b8e",
+      "name": "Data Analysis"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ed2a54be-4464-4699-875c-811c3237a918",
+              "leftValue": "={{$json.max_missing_percentage}}",
+              "rightValue": 20,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        144,
+        256
+      ],
+      "id": "b2489a2d-63e6-470f-8888-3523a337b139",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fd5dec55-d4ef-498b-af9d-6c54ae432d3c",
+              "name": "workflow_status",
+              "value": "Stopped",
+              "type": "string"
+            },
+            {
+              "id": "8c04e380-8c64-4219-bbe9-b134dbf1f2a1",
+              "name": "reason",
+              "value": "Missing values exceed acceptable threshold",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        352,
+        160
+      ],
+      "id": "d7e52997-25e5-4706-82df-daa1a113f734",
+      "name": "TRUE BRANCH"
+    },
+    {
+      "parameters": {
+        "jsCode": "const originalItems = $items(\"Extract from File\");\n\nlet cleaned = [];\n\nfor (const item of originalItems) {\n  const row = item.json;\n\n  if (row.age === null || row.age === undefined || String(row.age).trim() === \"\") {\n    continue;\n  }\n\n  if (isNaN(parseFloat(row.salary))) {\n    continue;\n  }\n\n  row.employee_id = parseInt(row.employee_id);\n  row.age = parseInt(row.age);\n  row.salary = parseFloat(row.salary);\n  row.joining_year = parseInt(row.joining_year);\n\n  cleaned.push({ json: row });\n}\n\nreturn cleaned;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        352
+      ],
+      "id": "91e3c287-0f36-4a49-9187-7a18faca8c59",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.all().map(item => item.json);\n\nlet report = \"EMPLOYEE DATA REPORT\\n\\n\";\n\nreport += `Total Clean Records: ${data.length}\\n\\n`;\n\nlet totalSalary = 0;\nlet totalAge = 0;\n\nfor (let row of data) {\n  totalSalary += row.salary;\n  totalAge += row.age;\n}\n\nreport += `Average Salary: ${(totalSalary / data.length).toFixed(2)}\\n`;\nreport += `Average Age: ${(totalAge / data.length).toFixed(2)}\\n\\n`;\n\nreport += \"Sample Records:\\n\";\n\ndata.slice(0,5).forEach(row => {\n  report += `${row.name} | ${row.department} | ${row.salary}\\n`;\n});\n\nreturn [\n  {\n    json: {\n      report: report\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        544
+      ],
+      "id": "0684b71d-3993-4b9c-b04b-1e5dd8fb7d09",
+      "name": "Report"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "report",
+        "binaryPropertyName": "final_report.txt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -192,
+        544
+      ],
+      "id": "4de4c39f-b990-46e7-9ea6-b95c3ba5697b",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "C:\\Users\\Rathan Kamble\\.n8n-files\\final_report.txt",
+        "dataPropertyName": "final_report.txt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        544
+      ],
+      "id": "3a109548-4148-43c2-ad88-fbf1eb534d52",
+      "name": "Read/Write Files from Disk1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Data Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Analysis Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Analysis": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analysis Summary": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "TRUE BRANCH",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "09259ef3-2960-415a-bc6f-18a4b473f63c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bf0085a6eff700d21f26f532eda4380bd1fc7d22c8b1eab7e1209e5b64bba2f3"
+  },
+  "id": "Dc58jJRzbwcL0jo9",
+  "tags": []
+}
